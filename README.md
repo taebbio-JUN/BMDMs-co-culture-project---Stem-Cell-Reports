@@ -1,7 +1,6 @@
 # HN00273522 — Bulk RNA-seq Analysis of BMDM × Intestinal Organoid Co-culture under TNFα Challenge
 
 [![R](https://img.shields.io/badge/R-%E2%89%A54.3.0-blue)](https://www.r-project.org/)
-[![License](https://img.shields.io/badge/license-MIT-green)]()
 
 R-based bulk RNA-seq analysis pipeline for a bone marrow–derived macrophage (BMDM) × intestinal organoid co-culture system under TNFα challenge. The pipeline performs differential expression analysis, multi-platform validation, functional enrichment, co-expression network construction, and curated gene-panel visualization across 24 samples organized into eight biological groups (n = 3 per group).
 
