@@ -1,13 +1,175 @@
-Bulk RNA sequencing, read processing, and downstream bioinformatic analysis
-Library preparation and sequencing. Total RNA extracted from 24 biological samples — comprising eight experimental groups (Organoid, Organoid+TNFα, Organoid+BMDM 1K, Organoid+BMDM 5K, Organoid+TNFα+BMDM 1K, Organoid+TNFα+BMDM 5K, Macrophage, Macrophage+TNFα; n = 3 per group) — was submitted to Macrogen Inc. (Seoul, Republic of Korea) for library construction and sequencing. All samples passed the company's standard sample QC criteria prior to library preparation. rRNA-depleted strand-specific libraries were generated using the TruSeq Stranded Total RNA with Ribo-Zero H/M/R_Gold kit (Illumina) with dual-index adapters, and paired-end 101-bp sequencing was performed on an Illumina platform (NovaSeq series, throughput run, 101 bp × 2; target output ≈ 6 Gb per sample).
-Read processing, alignment, and gene-level quantification. Raw FASTQ files were processed through a conventional reference-based transcriptome workflow at the sequencing provider. Sequencing adapters and low-quality bases were trimmed with Trimmomatic, and trimmed reads were aligned to the Mus musculus reference genome (GRCm38) using HISAT2 with default strand-specific options. Aligned reads were assembled and quantified at the transcript and gene level with StringTie, and gene- and transcript-level count matrices were generated using the prepDE.py utility, yielding a composite gene_count_matrix.csv with hybrid identifiers comprising Ensembl gene IDs (ENSMUSG), official gene symbols, and StringTie-assembled novel transcript identifiers (MSTRG).
-Pre-processing and DESeqDataSet construction. All downstream analyses were performed in R [v 4.X.X] under a single integrated pipeline. The gene-level count matrix was imported with read.csv() preserving original sample-column names. Composite identifiers were parsed to retain only entries with a resolvable Ensembl ID or gene symbol; entries representing StringTie-only novel transcripts without annotation were excluded. Sample columns were mapped to standardized group names, and group factor levels were defined to preserve the experimental hierarchy. Raw counts were coerced to integers and used to construct a DESeqDataSet (DESeq2 [v 1.4X.X]) under the design formula ~ group. Low-count features were filtered by requiring ≥10 counts in at least 3 samples.
-Normalization, variance stabilization, and quality control. Size factors and dispersion estimates were computed via DESeq() using the median-of-ratios method. Variance-stabilizing transformation (vst, blind = FALSE) was applied for visualization and sample-level distance analysis. Quality control included: (i) per-sample log₂(count + 1) histograms and boxplots before and after pre-filtering, (ii) detected-gene counts per sample, (iii) DESeq2-normalized count boxplots, (iv) principal component analysis (PCA) on VST-transformed counts using plotPCA(), (v) Euclidean sample-to-sample distance heatmaps with hierarchical clustering (pheatmap [v 1.0.X]), and (vi) mean–dispersion plots via plotDispEsts().
-Differential expression analysis. A six-tier contrast structure comprising 14 pairwise comparisons was defined to dissect basal co-culture effects, TNFα-induced inflammation, and macrophage–organoid hybrid responses against distinct biological baselines (untreated Organoid, untreated Macrophage, TNFα-Organoid, TNFα-Macrophage). For each contrast, results() was called with α = 0.05, and log₂ fold-change shrinkage was performed with lfcShrink() using the ashr estimator (ashr [v 2.2.X]). Differentially expressed genes (DEGs) were defined as features with Benjamini–Hochberg-adjusted p-value (padj) < 0.05 and |log₂ fold-change| > 1.0. Gene annotation (SYMBOL, ENTREZID, ENSEMBL, GENENAME) was assigned through AnnotationDbi::select() queries against org.Mm.eg.db [v 3.1X.X] and EnsDb.Mmusculus.v79 [v 2.99.0], with SYMBOL as the primary key and ENSEMBL as fallback for unmatched entries.
-Cross-platform DEG validation. To assess robustness of the DESeq2 results, two orthogonal frameworks were applied to selected contrasts. (i) For limma+voom analysis (limma [v 3.6X.X], edgeR [v 4.X.X]), per-contrast DGEList objects were filtered with filterByExpr(), TMM-normalized via calcNormFactors(), voom-transformed, and fit with lmFit() followed by empirical-Bayes moderation (eBayes). (ii) For edgeR-based analysis, after identical filtering and TMM normalization, dispersions were estimated with estimateDisp() and a quasi-likelihood F-test was performed via glmQLFit() followed by glmTreat() with the same log₂ fold-change threshold (1.0) used in DESeq2. DEG overlap across the three platforms was tabulated for each contrast.
-Visualization of DEG results. Volcano plots were generated with EnhancedVolcano [v 1.2X.X] using padj < 0.05 and |log₂FC| > 1.0 as significance thresholds, with significance categories color-coded by log₂FC and p-value strata. Curated gene-panel heatmaps were drawn with pheatmap on log₂ fold-change matrices (rows = genes, columns = contrasts within tier), with sub-panel grouping shown as row annotations and significance levels overlaid as asterisks (*, padj < 0.05; **, padj < 0.01; ***, padj < 0.001). Color scales were symmetric around zero and capped at ±6 log₂FC for visual interpretability. Sub-panel-level module scores were computed as the mean log₂FC across all panel members per contrast, and panel-level activation versus zero was tested by one-sample t-test.
-Functional enrichment analysis. Gene Ontology (Biological Process, Cellular Component, Molecular Function) and KEGG pathway over-representation analyses were performed with clusterProfiler [v 4.X.X] using enrichGO() and enrichKEGG(), with the universe defined as all Entrez-annotated genes in the filtered dataset, Benjamini–Hochberg p-value adjustment, pvalueCutoff = 0.05 (GO) or 0.1 (KEGG), and qvalueCutoff = 0.10 (GO) or 0.25 (KEGG). KEGG results were rendered human-readable via setReadable() against org.Mm.eg.db. Pre-ranked Gene Set Enrichment Analysis (GSEA) on log₂FC-ranked Entrez gene lists was performed with gseKEGG() (minGSSize = 10, maxGSSize = 500, seed = TRUE). Cross-platform enrichment validation was performed with gprofiler2 [v 0.2.X] (gost()) using g:SCS multiple-testing correction across GO:BP/MF/CC, KEGG, Reactome, and WikiPathways. Pathway-level log₂FC overlays on KEGG diagrams were produced with pathview [v 1.4X.X] (limits: gene = ±3, compound = ±1). Curated-pathway bubble plots were constructed manually with ggplot2 [v 3.X.X] and ggrepel [v 0.9.X] to visualize a fixed list of GO terms across all 14 contrasts simultaneously, with point size encoding gene count and color encoding −log₁₀(p-value); placeholder rows were added programmatically to ensure that non-enriched contrast × pathway combinations were represented as empty cells rather than omitted. Disease- and pathogen-related KEGG entries (viral infections, neurodegeneration, "Pathways in cancer", etc.) were excluded from dotplot visualizations via a curated blacklist to focus on mechanistic pathways.
-Sample-level pathway scoring (GSVA). As supplementary single-sample evidence, gene-set variation analysis was performed with GSVA [v 1.5X.X] on the VST-transformed expression matrix collapsed to gene symbols by maximum mean expression per gene, using curated gene panels as input gene sets. Group-wise differential GSVA scores were tested by limma lmFit() + eBayes().
-Co-expression network analysis. Weighted gene co-expression network analysis was performed with WGCNA [v 1.7X.X] on the VST-transformed expression matrix transposed to a samples-as-rows orientation. The soft-thresholding power was selected as the lowest integer between 1 and 20 satisfying scale-free topology R² ≥ 0.80 via pickSoftThreshold() (signed network, Pearson correlation), with a fallback power of 14 if no candidate met the criterion. Modules were detected with blockwiseModules() (maxBlockSize = 15000, TOMType = "signed", minModuleSize = 30, mergeCutHeight = 0.25, randomSeed = 6689). Module–trait correlations between module eigengenes and group identity (binarized via model.matrix(~ 0 + group)) were tested with corPvalueStudent() and visualized with labeledHeatmap().
-GSEA preprocessing exports. DESeq2-normalized count matrices and group definitions were exported in GCT (#1.2 header, ENTREZID-keyed) and CLS formats for compatibility with the Broad GSEA desktop application.
-Reproducibility. All random-seed-dependent procedures (WGCNA, GSEA) used fixed seeds. The complete R session environment, including package versions, is available via sessionInfo(). The full analysis pipeline (.R scripts), excluding the proprietary count matrix and project-specific configuration variables, is publicly available at [GitHub repository URL, Zenodo DOI].# BMDMs-co-culture-project---Stem-Cell-Reports
+HN00273522 — Bulk RNA-seq Analysis of BMDM × Intestinal Organoid Co-culture under TNFα Challenge
+이미지 표시 이미지 표시 이미지 표시
+R-based bulk RNA-seq analysis pipeline for a bone marrow–derived macrophage (BMDM) × intestinal organoid co-culture system under TNFα challenge. The pipeline performs differential expression analysis, multi-platform validation, functional enrichment, co-expression network construction, and curated gene-panel visualization across 24 samples organized into eight biological groups (n = 3 per group).
+
+Overview
+The experimental design comprises eight conditions:
+GroupTNFαBMDMDescriptionOrganoid−−Intestinal organoid monocultureOrganoid_TNFa+−Organoid + TNFαOrganoid_BMDM_1K−1KOrganoid + 1,000 BMDMOrganoid_BMDM_5K−5KOrganoid + 5,000 BMDMOrganoid_TNFa_BMDM_1K+1KOrganoid + TNFα + 1,000 BMDMOrganoid_TNFa_BMDM_5K+5KOrganoid + TNFα + 5,000 BMDMMacrophage−−BMDM monocultureMacrophage_TNFa+−BMDM + TNFα
+Pairwise comparisons are organized into a 6-tier, 14-contrast framework to dissect basal co-culture effects, TNFα-induced inflammation, and macrophage–organoid hybrid responses against distinct biological baselines.
+TierBaseline# ContrastsBiological questionTier 1Organoid2Basal effect of BMDM additionTier 2Macrophage2Basal effect of organoid co-culture on BMDMTier 3Organoid3Absolute TNFα-induced changes (Organoid reference)Tier 4Organoid + TNFα2BMDM modulation of TNFα-stimulated organoidTier 5Macrophage3TNFα effect on BMDM ± organoidTier 6Macrophage + TNFα2Organoid modulation of TNFα-stimulated BMDM
+
+Repository structure
+.
+├── README.md
+├── LICENSE
+├── renv.lock                         # Pinned package versions
+├── sessionInfo.txt                   # Full R session record
+│
+├── scripts/
+│   ├── 01_inspect_count_matrix.R     # Raw matrix structure & QC
+│   ├── 02_DEG_master_pipeline.R      # DESeq2 + limma + edgeR + WGCNA + GSEA export
+│   ├── 03_inflammation_bubble.R      # Inflammation gene-panel visualization (all contrasts)
+│   ├── 04_inflammation_bubble_noTNF.R
+│   ├── 04_inflammation_bubble_TNF.R
+│   ├── 05_stemness_bubble_TNF.R
+│   ├── 06_stemness_bubble_noTNF.R
+│   ├── 06_1_stemness_layoutA.R       # Curated GO BP bubble layout — basal
+│   └── 06_2_stemness_layoutB.R       # Curated GO BP bubble layout — full
+│
+├── data/
+│   └── README.md                     # Pointer to deposited raw FASTQ + count matrix
+│                                     # (see "Data availability" below)
+│
+├── output/                           # Auto-generated, .gitignored
+│   ├── QC/
+│   ├── DEG_results/
+│   ├── Volcano/
+│   ├── GO_KEGG/
+│   ├── Pathview/
+│   ├── gProfiler2/
+│   ├── limma/
+│   ├── edgeR/
+│   ├── WGCNA/
+│   ├── GSEA_export/
+│   └── tables/
+│
+└── docs/
+    └── pipeline_overview.png         # Workflow diagram
+
+Requirements
+System
+
+R ≥ 4.3.0
+Operating system: Windows 10/11, macOS ≥ 12, or Linux (Ubuntu ≥ 20.04)
+RAM: ≥ 16 GB recommended (WGCNA step is memory-intensive)
+Internet connection required for KEGG/Reactome/gProfiler API queries
+
+R packages
+All package versions are pinned in renv.lock and can be restored in one step:
+rinstall.packages("renv")
+renv::restore()
+Core analysis (Bioconductor): DESeq2, limma, edgeR, ashr, apeglm, clusterProfiler, enrichplot, DOSE, pathview, gage, gageData, GSVA, EnhancedVolcano, WGCNA, topGO, KEGGREST
+Annotation: org.Mm.eg.db, EnsDb.Mmusculus.v79, AnnotationDbi
+Visualization & utilities: ggplot2, ggrepel, pheatmap, RColorBrewer, patchwork, corrplot, ggfortify, ggforce, gprofiler2, tidyverse, matrixStats, Hmisc, dynamicTreeCut, fastcluster
+Exact versions used in the published analysis are recorded in sessionInfo.txt.
+
+Upstream pipeline (sequencing → counts)
+Library preparation and sequencing were performed by Macrogen Inc. (Seoul, Republic of Korea) using the TruSeq Stranded Total RNA with Ribo-Zero H/M/R_Gold kit, paired-end 101 bp × 2 on the Illumina platform.
+Read processing was performed by the sequencing provider as follows:
+FASTQ (raw) 
+   └── Trimmomatic (adapter & quality trimming)
+        └── HISAT2 (alignment to GRCm38, strand-specific)
+             └── StringTie (transcript assembly + quantification)
+                  └── prepDE.py → gene_count_matrix.csv
+                                  transcript_count_matrix.csv
+This repository takes gene_count_matrix.csv as its primary input.
+
+Downstream analysis (this repository)
+gene_count_matrix.csv
+   │
+   ├── 01: Matrix structure & integrity QC
+   │
+   ├── 02: Integrated master pipeline
+   │   ├── DESeqDataSet construction (~ group, 8 levels)
+   │   ├── Pre-filter (≥10 counts in ≥3 samples)
+   │   ├── DESeq2 normalization + VST + PCA + sample-distance heatmap
+   │   ├── 14 contrasts × ashr LFC shrinkage
+   │   ├── EnhancedVolcano (×14)
+   │   ├── clusterProfiler GO (BP/CC/MF) + KEGG (×14)
+   │   ├── pathview KEGG overlays (selected contrasts)
+   │   ├── gprofiler2 cross-validation (g:SCS)
+   │   ├── limma + voom (TMM) cross-validation
+   │   ├── edgeR + glmQLFit + glmTreat cross-validation
+   │   ├── WGCNA co-expression network (signed, R² ≥ 0.80)
+   │   └── GSEA-formatted exports (.gct + .cls)
+   │
+   ├── 03–04: Inflammation gene-panel visualization
+   │   ├── Sub-panel LFC heatmaps per tier
+   │   ├── Sub-panel module score (mean LFC + one-sample t-test)
+   │   ├── KEGG ORA lollipop plots (Inflammation vs Apoptosis/Resolution)
+   │   ├── Filtered KEGG dotplots (pathogen/disease blacklist)
+   │   ├── GSEA enrichment plots for inflammation pathways
+   │   └── GSVA sample-level scoring (supplementary)
+   │
+   └── 05–06: Stemness gene-panel visualization
+       ├── ISC + lineage panel heatmaps (8 sub-panels)
+       ├── Curated GO BP bubble plots (Layout A: basal 4 contrasts; Layout B: full 14)
+       ├── KEGG/GO MF/GO CC bubble plots per baseline
+       └── 6-way Venn intersection of stem-cell DEGs
+
+Usage
+1. Restore environment
+rrenv::restore()
+2. Place input data
+Copy or symlink gene_count_matrix.csv into the project root, or modify the file_path variable at the top of 02_DEG_master_pipeline.R.
+3. Run the master pipeline
+rsource("scripts/02_DEG_master_pipeline.R")
+This generates the full output/ directory (~3–5 GB) and writes the following key RDS objects to the working directory:
+
+dds_full_8groups.rds
+vsd_full_8groups.rds
+deg_results_full_8groups.rds
+gene_annotation.rds
+contrast_tiers.rds
+
+4. Run downstream visualization scripts
+These depend on the RDS objects from step 3 and can be run in any order:
+rsource("scripts/03_inflammation_bubble.R")
+source("scripts/05_stemness_bubble_TNF.R")
+source("scripts/06_stemness_bubble_noTNF.R")
+Expected runtime
+StepApproximate time (16 GB RAM, 8-core CPU)01 (matrix QC)< 1 min02 (master pipeline, all 14 contrasts)45–90 min02 — WGCNA only5–15 min03–06 (visualization)5–15 min each
+
+Key parameters
+All thresholds are defined as variables at the top of 02_DEG_master_pipeline.R and inherited by downstream scripts:
+ParameterValueDescriptionpadj_cutoff0.05BH-adjusted p-value cutoff for DEGlfc_cutoff1.0Minimum |log₂FC| for DEGmin_dds_count10Per-gene count threshold for pre-filtermin_dds_count_min_rowSums3Minimum samples meeting count thresholdwgcna_seed6689Random seed for blockwiseModules()WGCNA scale-free R²0.80Minimum R² for soft-threshold selectionWGCNA mergeCutHeight0.25Module-merging thresholdGSEA minGSSize10Minimum gene-set sizeGSEA maxGSSize500Maximum gene-set size
+
+Data availability
+
+Raw sequencing reads (FASTQ): deposited at ArrayExpress under accession E-MTAB-XXXXX, with corresponding ENA Study accession PRJEB-XXXXX.
+Gene-level count matrix: distributed with the ArrayExpress submission as processed data, and additionally archived at Zenodo (DOI: 10.5281/zenodo.XXXXXXX).
+Curated gene panels (Inflammation: 9 sub-panels; Stemness/Lineage: 8 sub-panels) are defined in-script and exported as Supplementary Tables in the associated manuscript.
+
+
+Citation
+If you use this pipeline or its outputs, please cite:
+
+Lee T.B., et al. (2026). [Manuscript title]. [Journal], [volume]:[pages]. DOI: [xxxxxxx]
+
+And the underlying tools — at minimum:
+
+Love M.I., Huber W., Anders S. (2014). Moderated estimation of fold change and dispersion for RNA-seq data with DESeq2. Genome Biology 15:550.
+Ritchie M.E., et al. (2015). limma powers differential expression analyses for RNA-sequencing and microarray studies. Nucleic Acids Research 43:e47.
+Robinson M.D., McCarthy D.J., Smyth G.K. (2010). edgeR: a Bioconductor package for differential expression analysis of digital gene expression data. Bioinformatics 26:139–140.
+Wu T., et al. (2021). clusterProfiler 4.0: A universal enrichment tool for interpreting omics data. The Innovation 2:100141.
+Langfelder P., Horvath S. (2008). WGCNA: an R package for weighted correlation network analysis. BMC Bioinformatics 9:559.
+
+
+Reproducibility checklist
+
+ All package versions pinned via renv.lock
+ Full sessionInfo() archived
+ Random seeds fixed for WGCNA and GSEA
+ Pre-filtering and DEG cutoffs declared as named variables
+ Raw counts and metadata publicly deposited
+ Pipeline runnable end-to-end from gene_count_matrix.csv
+
+
+License
+Released under the MIT License — see LICENSE.
+
+Contact
+Tae Baek Lee (이태백)
+Laboratory of Veterinary Physiology, College of Veterinary Medicine, Jeju National University
+[email: taebbio@stu.jejunu.ac.kr] 
+Principal Investigator: Prof. Changhwan Ahn
