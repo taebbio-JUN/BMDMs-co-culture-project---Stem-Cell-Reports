@@ -1,6 +1,5 @@
 # HN00273522 — Bulk RNA-seq Analysis of BMDM × Intestinal Organoid Co-culture under TNFα Challenge
 
-[![DOI](https://zenodo.org/badge/DOI/XXXXXXX.svg)](https://doi.org/XXXXXXX)
 [![R](https://img.shields.io/badge/R-%E2%89%A54.3.0-blue)](https://www.r-project.org/)
 [![License](https://img.shields.io/badge/license-MIT-green)]()
 
