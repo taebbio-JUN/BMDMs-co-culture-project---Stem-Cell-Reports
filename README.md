@@ -263,18 +263,12 @@ And the underlying tools — at minimum:
 
 ---
 
-## License
-
-Released under the MIT License — see `LICENSE`.
-
----
 
 ## Contact
 
 **Tae Baek Lee (이태백)**
 Laboratory of Veterinary Physiology, College of Veterinary Medicine, Jeju National University
-- Email: [your.email@jejunu.ac.kr]
-- ORCID: [0000-0000-0000-0000]
-- GitHub: [@yourhandle]
+- Email: [taebbio@jejunu.ac.kr]
 
-**Principal Investigator:** Prof. Changhwan Ahn
+
+**Principal Investigator:** Prof. Changhwan Ahn (cahn@jejunu.ac.kr)
